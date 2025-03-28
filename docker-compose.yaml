@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: test-db
+    environment:
+      POSTGRES_DB: test
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5001:5432"
+    networks:
+      - sam-local
+    volumes:
+      - test-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d test -h localhost -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: ["postgres", "-c", "shared_preload_libraries=vector"]
+
+networks:
+  sam-local:
+    name: sam-local
+
+volumes:
+  test-pg-data:

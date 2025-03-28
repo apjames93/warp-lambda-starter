@@ -1,0 +1,67 @@
+name: CI/CD for sam-rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U root"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 📦 Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: 🧰 Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config zip make docker.io
+
+      - name: 🧰 Install AWS SAM CLI
+        run: |
+          pip install --upgrade aws-sam-cli
+
+      - name: ✅ Validate SAM Template
+        run: sam validate --lint
+  
+      - name: 📦 Install Cargo Lambda
+        run: cargo install cargo-lambda
+
+      # - name: 🔧 Build libpq Lambda Layer
+      #   run: make sh-libpq
+
+      - name: 🛠️ Build Lambda with SAM
+        run: make sam-build
