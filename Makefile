@@ -82,3 +82,17 @@ lint:
 
 # Format and lint code
 pretty: format lint
+
+
+test:
+	(cd rust_app && DATABASE_URL=$${DATABASE_URL:-postgres://root:password@localhost:5001/test} cargo test --all --all-features -- --nocapture)
+
+
+help:
+	@echo "Available commands:"
+	@echo "  make format     - Run rustfmt on all code"
+	@echo "  make lint       - Run clippy and fail on warnings"
+	@echo "  make test       - Run unit and integration tests"
+	@echo "  make sam-build  - Build Lambda function using SAM"
+	@echo "  make sam-run    - Run API locally via SAM"
+	@echo "  make deploy-sam - Deploy to AWS"

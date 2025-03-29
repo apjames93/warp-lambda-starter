@@ -55,8 +55,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libssl-dev pkg-config zip make curl unzip python3-pip
       
-      - name: 🧹 Format and Lint Code (make pretty) fail fast
+      - name: 🧹 Format and Lint Code (make pretty)
         run: make pretty
+
+      - name: 🔬 Run Integration Tests
+        run: make test
+        env:
+          DATABASE_URL: postgres://root:password@localhost:5432/test
 
       - name: Install AWS SAM CLI
         run: pip3 install aws-sam-cli --upgrade
