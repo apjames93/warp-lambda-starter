@@ -12,7 +12,7 @@ env:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     services:
       postgres:
@@ -30,13 +30,17 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🔧 Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-musl
+          profile: minimal
 
-      - name: 📦 Cache Cargo registry
+      - name: 📦 Cache Cargo registry and target
         uses: actions/cache@v3
         with:
           path: |
@@ -45,23 +49,51 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: 🧰 Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config zip make docker.io
+          sudo apt-get install -y libssl-dev pkg-config zip make curl unzip python3-pip
+      
 
-      - name: 🧰 Install AWS SAM CLI
-        run: |
-          pip install --upgrade aws-sam-cli
+      - name: Install AWS SAM CLI
+        run: pip3 install aws-sam-cli --upgrade
 
-      - name: ✅ Validate SAM Template
+      - name: Validate SAM Template
         run: sam validate --lint
-  
-      - name: 📦 Install Cargo Lambda
-        run: cargo install cargo-lambda
 
-      # - name: 🔧 Build libpq Lambda Layer
-      #   run: make sh-libpq
+      - name: Cache Cargo Binaries
+        id: cache-cargo-bin
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-cargo-lambda
+
+      - name: Install cargo-lambda
+        if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
+        run: cargo install cargo-lambda --locked
+
+      - name: Cache Zig
+        id: cache-zig
+        uses: actions/cache@v3
+        with:
+          path: ~/.zig
+          key: ${{ runner.os }}-zig-0.10.1
+
+      - name: Install Zig
+        if: steps.cache-zig.outputs.cache-hit != 'true'
+        run: |
+          ZIG_VERSION=0.10.1
+          mkdir -p ~/.zig/bin
+          wget https://ziglang.org/download/$ZIG_VERSION/zig-linux-x86_64-$ZIG_VERSION.tar.xz
+          tar -xf zig-linux-x86_64-$ZIG_VERSION.tar.xz
+          mv zig-linux-x86_64-$ZIG_VERSION/* ~/.zig/bin
+          echo "$HOME/.zig/bin" >> $GITHUB_PATH
+
+      - name: Add Zig to PATH
+        run: echo "$HOME/.zig/bin" >> $GITHUB_PATH
 
       - name: 🛠️ Build Lambda with SAM
-        run: make sam-build
+        shell: bash
+        run: |
+          export PATH="$HOME/.cargo/bin:$HOME/.zig/bin:$PATH"
+          make sam-build
