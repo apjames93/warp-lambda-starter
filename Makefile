@@ -64,3 +64,21 @@ deploy-sam:
 # Delete the deployed SAM stack from AWS without prompting.
 delete-sam:
 	sam delete --no-prompts --stack-name $(BACKEND_STACK_NAME)
+
+
+# =======================================
+# Utility Commands
+# =======================================
+
+# Format all code
+format:
+	@echo "Formatting all code..."
+	(cd rust_app && cargo fmt --all)
+
+# Lint all code
+lint:
+	@echo "Linting all code..."
+	(cd rust_app && cargo clippy --tests --all-features -- -D warnings)
+
+# Format and lint code
+pretty: format lint

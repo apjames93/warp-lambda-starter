@@ -39,6 +39,7 @@ jobs:
           toolchain: stable
           target: x86_64-unknown-linux-musl
           profile: minimal
+          components: rustfmt, clippy
 
       - name: 📦 Cache Cargo registry and target
         uses: actions/cache@v3
@@ -54,6 +55,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libssl-dev pkg-config zip make curl unzip python3-pip
       
+      - name: 🧹 Format and Lint Code (make pretty) fail fast
+        run: make pretty
 
       - name: Install AWS SAM CLI
         run: pip3 install aws-sam-cli --upgrade
