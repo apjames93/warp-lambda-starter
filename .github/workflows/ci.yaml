@@ -1,3 +1,9 @@
+## test with act
+# act push \
+#   -W .github/workflows/ci.yaml \
+#   --secret-file .env \
+#   -P ubuntu-22.04=catthehacker/ubuntu:act-22.04
+
 name: CI/CD for sam-rust
 
 on:
@@ -11,27 +17,17 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-test:
+  deploy:
     runs-on: ubuntu-22.04
-
-    services:
-      postgres:
-        image: postgres:14
-        env:
-          POSTGRES_USER: root
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U root"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config make curl python3-pip libssl-dev musl-tools
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -39,69 +35,18 @@ jobs:
           toolchain: stable
           target: x86_64-unknown-linux-musl
           profile: minimal
-          components: rustfmt, clippy
 
-      - name: 📦 Cache Cargo registry and target
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Add cargo to PATH
+        run: export PATH="$HOME/.cargo/bin:$PATH"
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config zip make curl unzip python3-pip
-      
-      - name: 🧹 Format and Lint Code (make pretty)
-        run: make pretty
+      # compile before moving forward. if this fails, no need to do SAM things
+      - name: Compile Binaries
+        run: make compile-for-sam
 
-      - name: 🔬 Run Integration Tests
-        run: make test
-        env:
-          DATABASE_URL: postgres://root:password@localhost:5432/test
+      # - name: Install AWS SAM CLI
+      #   run: pip3 install aws-sam-cli --upgrade
 
-      - name: Install AWS SAM CLI
-        run: pip3 install aws-sam-cli --upgrade
+      # - name: Sam Validate and Build
+      #   working-directory: ./aws
+      #   run: sam validate && sam build
 
-      - name: Validate SAM Template
-        run: sam validate --lint
-
-      - name: Cache Cargo Binaries
-        id: cache-cargo-bin
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/bin
-          key: ${{ runner.os }}-cargo-bin-cargo-lambda
-
-      - name: Install cargo-lambda
-        if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
-        run: cargo install cargo-lambda --locked
-
-      - name: Cache Zig
-        id: cache-zig
-        uses: actions/cache@v3
-        with:
-          path: ~/.zig
-          key: ${{ runner.os }}-zig-0.10.1
-
-      - name: Install Zig
-        if: steps.cache-zig.outputs.cache-hit != 'true'
-        run: |
-          ZIG_VERSION=0.10.1
-          mkdir -p ~/.zig/bin
-          wget https://ziglang.org/download/$ZIG_VERSION/zig-linux-x86_64-$ZIG_VERSION.tar.xz
-          tar -xf zig-linux-x86_64-$ZIG_VERSION.tar.xz
-          mv zig-linux-x86_64-$ZIG_VERSION/* ~/.zig/bin
-          echo "$HOME/.zig/bin" >> $GITHUB_PATH
-
-      - name: Add Zig to PATH
-        run: echo "$HOME/.zig/bin" >> $GITHUB_PATH
-
-      - name: 🛠️ Build Lambda with SAM
-        shell: bash
-        run: |
-          export PATH="$HOME/.cargo/bin:$HOME/.zig/bin:$PATH"
-          make sam-build

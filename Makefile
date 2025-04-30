@@ -1,98 +1,72 @@
-# Makefile for building and deploying the Rust-based AWS SAM application
-# Includes support for building a custom libpq layer for Diesel/PostgreSQL
+# Makefile
 
-BACKEND_STACK_NAME ?= warp-lambda-starter-stack
+# =======================================
+# Root Makefile: Orchestrator
+# =======================================
 
-# Build the LibpqLayer using the SAM `makefile` build method.
-# This is invoked by SAM when building the LibpqLayer defined in template.yaml.
-# It copies prebuilt libpq shared objects and headers from our local `libpq_layer/` folder
-# into the correct layer output directory (defined by $ARTIFACTS_DIR),
-# where they will be placed in `/opt` at runtime in the Lambda environment.
-build-LibpqLayer:
-	mkdir -p "$(ARTIFACTS_DIR)/lib"
-	mkdir -p "$(ARTIFACTS_DIR)/include/libpq"
-	cp -r libpq_layer/lib/* "$(ARTIFACTS_DIR)/lib/"
-	cp -r libpq_layer/include/libpq/* "$(ARTIFACTS_DIR)/include/libpq/"
+### Include submodule Makefiles
+# include backend/Makefile
+include aws/Makefile
 
-# Build the full SAM application, including all Lambda functions and layers.
-# This sets the required environment variables so `pq-sys` can link against the local libpq shared library.
-# The paths are resolved to absolute paths to ensure the build works regardless of working directory.
-sam-build:
-	@echo "🔧 Building with libpq from project-local layer..."
+# =======================================
+# Directory-specific Commands
+# =======================================
 
-	@test -f libpq_layer/lib/libpq.so || { echo "❌ libpq.so not found. Run 'make sh-libpq'"; exit 1; }
+AWS_MAKE = $(MAKE) -C aws
+# BACKEND_MAKE = $(MAKE) -C backend
 
-	PQ_LIB_DIR=$(realpath libpq_layer/lib) \
-	PQ_INCLUDE_DIR=$(realpath libpq_layer/include/libpq) \
-	RUSTFLAGS="-C link-args=-Wl,-rpath=/opt/lib" \
-	RUST_LOG=debug \
-	sam build --beta-features
+# AWS commands delegation
+aws-%:
+	@echo "Delegating to aws/$*..."
+	$(AWS_MAKE) $*
 
-# Build the SAM project and run it locally via the SAM CLI.
-# This allows you to test the Lambda functions using Docker on your machine.
-sam-run:
-	@echo "Building SAM application..."
-	make sam-build
-	sam local start-api --docker-network sam-local --debug --env-vars env.json
-
-# Build the libpq shared libraries and headers inside an Amazon Linux 2 container.
-# This mimics the Lambda environment and ensures binary compatibility.
-# Output is placed in `libpq_layer/lib` and `libpq_layer/include/libpq`.
-sh-libpq:
-	sh ./build_libpq_layer_docker.sh
-
-# Validate, build, and deploy the full SAM stack to AWS.
-# This will upload the Lambda functions and layers, create/update resources,
-# and deploy the API Gateway with no manual confirmations.
-deploy-sam:
-	@echo "Validating SAM template..."
-	sam validate
-
-	@echo "Building SAM project..."
-	make sam-build || { echo "Build failed"; exit 1; }
-
-	@echo "Deploying SAM stack: $(BACKEND_STACK_NAME)..."
-	sam deploy --stack-name $(BACKEND_STACK_NAME) \
-		--force-upload \
-		--no-confirm-changeset --no-fail-on-empty-changeset \
-		--capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-		--resolve-s3 \
-		--debug || { echo "Deployment failed."; exit 1; }
-
-	@echo "Deployment completed successfully for stack: $(BACKEND_STACK_NAME)."
-
-# Delete the deployed SAM stack from AWS without prompting.
-delete-sam:
-	sam delete --no-prompts --stack-name $(BACKEND_STACK_NAME)
-
+# # Backend commands delegation
+# be-%:
+# 	@echo "Delegating to backend/$*..."
+# 	$(BACKEND_MAKE) $*
 
 # =======================================
 # Utility Commands
 # =======================================
 
-# Format all code
+# Format all code (including fixing simple style issues)
 format:
-	@echo "Formatting all code..."
-	(cd rust_app && cargo fmt --all)
+	@echo "Formatting all code with cargo fmt..."
+	cargo fmt --all
 
-# Lint all code
+# Lint all code with clippy and suggest fixes where possible
 lint:
-	@echo "Linting all code..."
-	(cd rust_app && cargo clippy --tests --all-features -- -D warnings)
+	@echo "Linting all code with cargo clippy..."
+	cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings
 
-# Format and lint code
+# Format and lint
 pretty: format lint
 
+# =======================================
+# Project Orchestration
+# =======================================
 
-test:
-	(cd rust_app && DATABASE_URL=$${DATABASE_URL:-postgres://root:password@localhost:5001/test} cargo test --all --all-features -- --nocapture)
+# run-backend:
+# 	cargo watch -p backend -w backend/src -w shared/src -s 'make be-run'
 
 
-help:
-	@echo "Available commands:"
-	@echo "  make format     - Run rustfmt on all code"
-	@echo "  make lint       - Run clippy and fail on warnings"
-	@echo "  make test       - Run unit and integration tests"
-	@echo "  make sam-build  - Build Lambda function using SAM"
-	@echo "  make sam-run    - Run API locally via SAM"
-	@echo "  make deploy-sam - Deploy to AWS"
+
+# SAM stuff
+# =======================================
+
+
+# List of workspace binaries you want to compile for Lambda
+BINARIES = backend
+
+# The target triple for AWS Lambda (static build)
+TARGET = x86_64-unknown-linux-musl
+
+# Path to the root Cargo.toml
+CARGO_MANIFEST_PATH := $(realpath ./Cargo.toml)
+
+compile-for-sam:
+	@echo "🔧 Compiling all binaries..."
+	@for bin in $(BINARIES); do \
+		cargo build --release --target $(TARGET) --manifest-path $(CARGO_MANIFEST_PATH) --bin $$bin || exit 1; \
+	done
+

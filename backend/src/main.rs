@@ -1,6 +1,6 @@
 // rust_app/src/main.rs
 
-use sam_rust::{db_healthcheck_handler, init_diesel_pool};
+use backend::{db_healthcheck_handler, init_diesel_pool};
 use tracing::{debug, error, info};
 use warp::Filter;
 
