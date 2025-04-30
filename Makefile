@@ -5,7 +5,7 @@
 # =======================================
 
 ### Include submodule Makefiles
-# include backend/Makefile
+include backend/Makefile
 include aws/Makefile
 
 # =======================================
@@ -13,7 +13,7 @@ include aws/Makefile
 # =======================================
 
 AWS_MAKE = $(MAKE) -C aws
-# BACKEND_MAKE = $(MAKE) -C backend
+BACKEND_MAKE = $(MAKE) -C backend
 
 # AWS commands delegation
 aws-%:
@@ -21,9 +21,9 @@ aws-%:
 	$(AWS_MAKE) $*
 
 # # Backend commands delegation
-# be-%:
-# 	@echo "Delegating to backend/$*..."
-# 	$(BACKEND_MAKE) $*
+be-%:
+	@echo "Delegating to backend/$*..."
+	$(BACKEND_MAKE) $*
 
 # =======================================
 # Utility Commands
@@ -46,27 +46,11 @@ pretty: format lint
 # Project Orchestration
 # =======================================
 
-# run-backend:
-# 	cargo watch -p backend -w backend/src -w shared/src -s 'make be-run'
-
-
+run-backend:
+	cargo watch -p backend -w backend/src -s 'make be-run'
 
 # SAM stuff
 # =======================================
 
-
-# List of workspace binaries you want to compile for Lambda
-BINARIES = backend
-
-# The target triple for AWS Lambda (static build)
-TARGET = x86_64-unknown-linux-musl
-
-# Path to the root Cargo.toml
-CARGO_MANIFEST_PATH := $(realpath ./Cargo.toml)
-
 compile-for-sam:
-	@echo "🔧 Compiling all binaries..."
-	@for bin in $(BINARIES); do \
-		cargo build --release --target $(TARGET) --manifest-path $(CARGO_MANIFEST_PATH) --bin $$bin || exit 1; \
-	done
-
+	cargo build --release --target x86_64-unknown-linux-musl --bin backend

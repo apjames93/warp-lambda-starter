@@ -21,25 +21,37 @@ async fn main() {
 
     info!("🚀 Starting warp_lambda runtime...");
 
-    for var in &[
-        "LD_LIBRARY_PATH",
-        "PQ_LIB_DIR",
-        "PQ_INCLUDE_DIR",
-        "PGSSLMODE",
-    ] {
-        match std::env::var(var) {
-            Ok(value) => info!("🔧 {} = {}", var, value),
-            Err(_) => debug!("⚠️ {} is not set", var),
-        }
-    }
+    // for var in &[
+    //     "LD_LIBRARY_PATH",
+    //     "PQ_LIB_DIR",
+    //     "PQ_INCLUDE_DIR",
+    //     "PGSSLMODE",
+    // ] {
+    //     match std::env::var(var) {
+    //         Ok(value) => info!("🔧 {} = {}", var, value),
+    //         Err(_) => debug!("⚠️ {} is not set", var),
+    //     }
+    // }
 
     init_diesel_pool();
 
-    let routes = warp::path!("Prod" / "hello")
+    let all_routes = warp::path!("Prod" / "hello")
         .and(warp::get())
         .and_then(db_healthcheck_handler);
 
-    warp_lambda::run(warp::service(routes))
-        .await
-        .expect("Failed to start warp_lambda runtime");
+
+    #[cfg(feature = "lambda")]
+    {
+        let warp_service = warp::service(all_routes);
+        warp_lambda::run(warp_service)
+            .await
+            .expect("An error occurred");
+    }
+
+    #[cfg(not(feature = "lambda"))]
+    {
+        info!("Running as a local Warp server...");
+        warp::serve(all_routes).run(([0, 0, 0, 0], 3000)).await;
+    }
+
 }

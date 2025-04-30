@@ -1,18 +1,12 @@
-# build_libpq_layer_docker.sh
-
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Script: build_libpq_layer_docker.sh
 #
-# Builds the PostgreSQL `libpq.so` shared library and headers inside an
-# Amazon Linux 2 container (Lambda-compatible). Outputs them to a `libpq_layer`
-# directory structure compatible with AWS Lambda Layers.
-#
-# The resulting files will be used in:
-#  - Lambda Layer at runtime (/opt/lib/libpq.so)
-#  - Diesel's `pq-sys` crate at build time via PQ_LIB_DIR/PQ_INCLUDE_DIR
+# Builds the PostgreSQL static libpq.a library and headers inside an
+# Alpine Linux (musl) container for use with x86_64-unknown-linux-musl Rust targets.
+# Outputs are written to `libpq_layer/lib` and `libpq_layer/include/libpq`.
 # ─────────────────────────────────────────────────────────────────────────────
 
 LAYER_DIR=libpq_layer
@@ -23,43 +17,34 @@ PG_TARBALL=postgresql-${PG_VERSION}.tar.gz
 PG_SRC_DIR=postgresql-${PG_VERSION}
 
 # Clean up previous builds
-rm -rf ${LAYER_DIR} ${PG_TARBALL} ${PG_SRC_DIR} libpq_layer.zip
-mkdir -p ${LIB_DIR} ${INCLUDE_DIR}
+rm -rf "${LAYER_DIR}" "${PG_TARBALL}" "${PG_SRC_DIR}" libpq_layer.zip
+mkdir -p "${LIB_DIR}" "${INCLUDE_DIR}"
 
+echo "📦 Starting build inside Alpine Linux (musl)..."
 docker run --rm \
   -v "$PWD":/layerbuild \
   -w /layerbuild \
-  amazonlinux:2 bash -c "
-  # Install build dependencies
-  yum install -y gcc make tar gzip wget readline-devel zlib-devel openssl-devel zip &&
-  
-  # Download and extract PostgreSQL source
-  wget https://ftp.postgresql.org/pub/source/v${PG_VERSION}/${PG_TARBALL} &&
-  tar -xzf ${PG_TARBALL} &&
+  alpine:latest sh -c "
+    set -e
+    apk add --no-cache build-base musl-dev openssl-dev zlib-dev wget tar &&
+    wget https://ftp.postgresql.org/pub/source/v${PG_VERSION}/${PG_TARBALL} &&
+    tar -xzf ${PG_TARBALL} &&
+    cd ${PG_SRC_DIR} &&
+    ./configure --prefix=/tmp/pg --disable-shared --without-readline --without-zlib &&
+    cd src/interfaces/libpq &&
+    make &&
+    make install &&
+    cp /tmp/pg/lib/libpq.a /layerbuild/${LIB_DIR}/ &&
+    cp -r /tmp/pg/include/* /layerbuild/${INCLUDE_DIR}/
+  "
 
-  # Configure and build only the libpq client library
-  cd ${PG_SRC_DIR} &&
-  ./configure --prefix=/tmp/pg --without-readline --without-zlib &&
-  cd src/interfaces/libpq &&
-  make &&
-  make install &&
-
-  # Copy output artifacts to host-mounted build directory
-  cp /tmp/pg/lib/libpq.so* /layerbuild/${LIB_DIR}/ &&
-  cp -r /tmp/pg/include/* /layerbuild/${INCLUDE_DIR}/
-"
-
-# Create symlink: libpq.so → libpq.so.5
-echo '🔗 Creating .so symlink...'
-cd ${LIB_DIR}
-ln -sf libpq.so.5 libpq.so
-cd - > /dev/null
-
-# Optional: zip the layer for manual upload (not used by SAM builds)
-echo '📦 Zipping the layer...'
+# Optional: zip the layer for manual upload or inspection
+echo '📦 Zipping the layer for inspection or manual use...'
 (cd ${LAYER_DIR} && zip -r ../libpq_layer.zip .)
 
-# Clean up downloaded and extracted PostgreSQL files
-rm -rf ${PG_TARBALL} ${PG_SRC_DIR}
+# Clean up downloaded source
+rm -rf "${PG_TARBALL}" "${PG_SRC_DIR}"
 
-echo '✅ Layer build complete: `libpq_layer` directory is ready'
+echo "✅ Static libpq layer build complete."
+echo "→ Library: ${LIB_DIR}/libpq.a"
+echo "→ Headers: ${INCLUDE_DIR}/"

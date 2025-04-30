@@ -39,14 +39,10 @@ jobs:
       - name: Add cargo to PATH
         run: export PATH="$HOME/.cargo/bin:$PATH"
 
-      # compile before moving forward. if this fails, no need to do SAM things
-      - name: Compile Binaries
-        run: make compile-for-sam
+      - name: Install AWS SAM CLI
+        run: pip3 install aws-sam-cli --upgrade
 
-      # - name: Install AWS SAM CLI
-      #   run: pip3 install aws-sam-cli --upgrade
-
-      # - name: Sam Validate and Build
-      #   working-directory: ./aws
-      #   run: sam validate && sam build
-
+      - name: Sam Validate and Build
+        run: |
+          make compile-for-sam
+          make aws-build-sam
