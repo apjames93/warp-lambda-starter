@@ -33,15 +33,3 @@ once_cell = "1.21.3"
 # reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
 # diesel = { version = "2.2.7", features = ["postgres", "r2d2", "uuid", "serde_json", "chrono", "numeric"] }
 # diesel-derive-enum = { version = "2.1.0", features = ["postgres"] }
-
-# [target.x86_64-unknown-linux-musl]
-# rustflags = [
-#   "-C", "link-arg=-L/path/to/libpq_layer/lib",
-#   "-C", "link-arg=-lpq",
-#   "-C", "link-arg=-lz",
-#   "-C", "link-arg=-lldap",
-#   "-C", "link-arg=-llber",
-#   "-C", "link-arg=-lssl",
-#   "-C", "link-arg=-lcrypto",
-#   "-C", "link-arg=-static",
-# ]

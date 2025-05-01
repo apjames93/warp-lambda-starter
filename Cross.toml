@@ -1,0 +1,4 @@
+[target.x86_64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:latest"
+env = { RUSTFLAGS = "-L /libpq_layer/lib -C link-arg=-lpq -C link-arg=-static -C link-arg=-Wl,--allow-multiple-definition" }
+volumes = [ "libpq_layer:/libpq_layer" ]

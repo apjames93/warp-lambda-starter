@@ -1,0 +1,47 @@
+# ========================================================
+# Dockerfile.build-sam: Rust AWS Lambda Builder for SAM
+# Target: Apple Silicon (M1/M2) compatibility via x86_64
+# ========================================================
+
+FROM ubuntu:22.04 AS builder
+
+# ----------------------------------------
+# 1. Install Build Essentials & OpenSSL + musl
+# ----------------------------------------
+# RUN apt-get update && sudo apt-get install -y build-essential pkg-config make curl python3-pip libssl-dev musl-tools
+
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y \
+    pkg-config build-essential perl curl make wget xz-utils \
+    libssl-dev musl-tools python3-pip \
+    libpq-dev gcc-multilib libgcc-s1
+
+# ----------------------------------------
+# 2. Install Rust (Stable Toolchain)
+# ----------------------------------------
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# ----------------------------------------
+# 2.5 Add Target for Lambda (provided.al2)
+# ----------------------------------------
+RUN rustup target add x86_64-unknown-linux-musl
+
+RUN rustup set profile minimal && rustup component add rust-src
+
+# ----------------------------------------
+# 3. Install AWS SAM CLI
+# ----------------------------------------
+RUN pip3 install aws-sam-cli
+
+# ----------------------------------------
+# 5. Copy Project Files for Build
+# ----------------------------------------
+WORKDIR /app
+COPY . .
+
+# ----------------------------------------
+# 6. Default CMD for Manual Testing
+# ----------------------------------------
+CMD ["bash"]

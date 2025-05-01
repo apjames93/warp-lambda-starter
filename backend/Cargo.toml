@@ -28,5 +28,7 @@ lambda_runtime = { version = "0.13.0", optional = true }
 r2d2 = { workspace = true }
 once_cell = { workspace = true }
 
+openssl = { version = "0.10.68", features = ["vendored"] }
+
 # openssl = { workspace = true }
 # lettre = { workspace = true }
