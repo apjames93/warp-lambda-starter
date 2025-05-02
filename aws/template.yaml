@@ -28,7 +28,7 @@ Resources:
         - provided.al2
       RetentionPolicy: Delete
 
-  HelloWorldFunction:
+  BackendFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: makefile
@@ -60,10 +60,10 @@ Outputs:
     Description: "API Gateway endpoint URL for Prod stage for Hello World function"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
 
-  HelloWorldFunction:
+  BackendFunction:
     Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
+    Value: !GetAtt BackendFunction.Arn
 
-  HelloWorldFunctionIamRole:
+  BackendFunctionIamRole:
     Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+    Value: !GetAtt BackendFunctionRole.Arn

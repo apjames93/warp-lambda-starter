@@ -1,31 +1,34 @@
 # aws/Makefile
+
+# aws/Makefile
 # Makefile for building and deploying the Rust-based AWS SAM application
 # Includes support for building a custom libpq layer for Diesel/PostgreSQL
 
+include $(dir $(lastword $(MAKEFILE_LIST)))docker/Makefile
+DOCKER_MAKE = $(MAKE) -C docker
+
+docker-%:
+	@echo "Delegating to docker/$*..."
+	$(DOCKER_MAKE) $*
 
 # =======================================
 # AWS SAM Build and Run Targets (Makefile)
 # =======================================
 
+build-sam:
+		make docker-build-sam
+
 # sam-run: runs the API locally via Lambda emulator
-sam-run:
-	@echo "Starting Local SAM application..."
+run-sam:
+	@echo "Starting Local SAM application from aws/..."
 	sam local start-api \
-		--env-vars ./env.json \
+		--template .aws-sam/template.yaml \
+		--env-vars env.json \
 		--docker-network sam-local \
 		--debug \
 		--port 4040
 
-
-# full local run
-sam-build-run:
-	make docker-sam-build
-	make sam-run
-
-build-sam:
-		RUST_LOG=debug sam build
-
-build-HelloWorldFunction:
+build-BackendFunction:
 		cp /app/target/x86_64-unknown-linux-musl/release/backend ${ARTIFACTS_DIR}/bootstrap
 
 # Build the LibpqLayer using the SAM `makefile` build method.
@@ -36,10 +39,6 @@ build-LibpqLayer:
 	cp libpq_layer/lib/libpq.a "$(ARTIFACTS_DIR)/lib/"
 	cp -r libpq_layer/include/libpq/* "$(ARTIFACTS_DIR)/include/libpq/"
 
-# Build the libpq static archive and headers inside an Amazon Linux 2 container.
-sh-libpq:
-	sh ./build_libpq_layer_docker.sh
-
 validate-sam:
 	sam validate
 
@@ -49,7 +48,7 @@ deploy-sam:
 	sam validate
 
 	@echo "Building SAM project..."
-	make sam-build || { echo "Build failed"; exit 1; }
+	make build-sam || { echo "Build failed"; exit 1; }
 
 	@echo "Deploying SAM stack: $(BACKEND_STACK_NAME)..."
 	sam deploy --stack-name $(BACKEND_STACK_NAME) \

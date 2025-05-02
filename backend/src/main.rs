@@ -21,18 +21,6 @@ async fn main() {
 
     info!("🚀 Starting warp_lambda runtime...");
 
-    // for var in &[
-    //     "LD_LIBRARY_PATH",
-    //     "PQ_LIB_DIR",
-    //     "PQ_INCLUDE_DIR",
-    //     "PGSSLMODE",
-    // ] {
-    //     match std::env::var(var) {
-    //         Ok(value) => info!("🔧 {} = {}", var, value),
-    //         Err(_) => debug!("⚠️ {} is not set", var),
-    //     }
-    // }
-
     init_diesel_pool();
 
     let all_routes = warp::path!("Prod" / "hello")
