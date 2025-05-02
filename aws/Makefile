@@ -24,6 +24,8 @@ docker-%:
 # Build the Lambda binary using a Docker image
 build-sam:
 	@echo "Building SAM project..."
+	rm -rf .aws-sam
+	mkdir -p .aws-sam
 	make docker-build-sam
 
 # Run the Lambda locally using SAM CLI and the provided env.json config

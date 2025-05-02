@@ -92,17 +92,27 @@ Inside SAM (Docker network `sam-local`):
 
 ## 🧪 Build the libpq Lambda Layer
 
-Diesel uses native `libpq`. We build a static layer with:
+> **Quick start:** The `aws/libpq_layer/` directory is pre-committed so you can start building and deploying immediately.
+>
+> **Advanced:** If you want to regenerate the layer (e.g. for a different PostgreSQL version, security updates, or reduced size), run:
 
 ```bash
 make aws-docker-sh-libpq
 ```
 
-What it does:
+This command:
 
-* Compiles `libpq.a`, `libssl.a`, and headers in Alpine
-* Outputs to `aws/libpq_layer/{lib, include}`
-* Creates a zip layer for use in both build **and** runtime
+* Builds `libpq.a`, `libssl.a`, and headers using Alpine + musl
+* Outputs everything to `aws/libpq_layer/{lib, include}`
+* Packages the layer as `libpq_layer.zip` for AWS Lambda use
+
+You’re free to customize or rebuild the layer anytime—just modify `aws/docker/build_libpq_layer_docker.sh`.
+
+Rebuild if:
+
+* You need a newer PostgreSQL version
+* You want smaller artifacts
+* You hit Lambda runtime linking errors
 
 ---
 
@@ -163,7 +173,7 @@ Even with static linking, Lambda may expect `.so` files at runtime:
 * Diesel sometimes loads symbols dynamically
 * Musl quirks can cause fallback dynamic linking
 
-So we attach the **same built files** as a Layer:
+To ensure compatibility, we attach the same static artifacts as a Lambda Layer:
 
 ```yaml
 Layers:
@@ -175,7 +185,7 @@ Environment:
     PQ_INCLUDE_DIR: /opt/include/libpq
 ```
 
-**Build-time and runtime use the same artifacts**. No duplication.
+🧠 **Lightbulb moment**: Build-time and runtime use the exact same files. No duplication. No surprises.
 
 ---
 
@@ -222,7 +232,7 @@ make aws-deploy-sam
 
 This runs `sam deploy` and provisions:
 
-* Lambda function
+* Lambda function (with `Handler: bootstrap`)
 * API Gateway endpoint
 * Attached Lambda Layer
 
@@ -247,19 +257,6 @@ act push \
 
 ---
 
-
-Your summary is strong and well-aligned with your audience—concise, practical, and full of high-signal takeaways. Here's some feedback and a lightly revised version to tighten it up:
-
----
-
-### ✅ What's Great
-
-* ✅ **Bullet mix**: You blend simple icon bullets (⌨️ 🐳 🚀) with richer explanations (🔁 Reuse is power). That dual tone works well for readers skimming vs. scanning for insight.
-* ✅ **Clear value props**: Hot reload, cross-compilation, native performance, DX—all clearly emphasized.
-* ✅ **Next steps** hint at advanced features without overwhelming first-time readers.
-
----
-
 ## ✅ Summary
 
 * ⌨️ Local dev with hot reloads using `cargo-watch`
@@ -281,6 +278,8 @@ Your summary is strong and well-aligned with your audience—concise, practical,
 * Set up full AWS infrastructure via CloudFormation (VPC, RDS, subnets, security groups)
 * Add RDS Proxy for pooled DB connections from Lambda
 * Support custom domains via API Gateway and Certbot in SAM
+* Use AWS Secrets Manager for storing credentials like `DATABASE_URL`
+* Add test flows for `/hello` route with `curl`/Postman examples
 
 ---
 
