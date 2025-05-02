@@ -7,34 +7,26 @@
 # AWS SAM Build and Run Targets (Makefile)
 # =======================================
 
-CROSS_TARGET = x86_64-unknown-linux-musl
-
-# docker-sam-build:
-# 	CROSS_CONTAINER_ENGINE=docker cross build --release --target $(CROSS_TARGET) --bin backend
-# 	mkdir -p ../.aws-sam/build/HelloWorldFunction
-# 	cp ../target/$(CROSS_TARGET)/release/backend ../.aws-sam/build/HelloWorldFunction/bootstrap
-# 	SAM_BUILD_MODE=debug sam build --template aws/template.yaml
-
-docker-sam-build:
-	CROSS_CONTAINER_ENGINE=docker cross build --release --target x86_64-unknown-linux-musl --bin backend
-	SAM_BUILD_MODE=debug sam build --template aws/template.yaml
-
 # sam-run: runs the API locally via Lambda emulator
 sam-run:
 	@echo "Starting Local SAM application..."
-	sam local start-api --env-vars ./env.json --debug --port 4040
+	sam local start-api \
+		--env-vars ./env.json \
+		--docker-network sam-local \
+		--debug \
+		--port 4040
+
 
 # full local run
 sam-build-run:
 	make docker-sam-build
 	make sam-run
 
-
 build-sam:
 		RUST_LOG=debug sam build
 
 build-HelloWorldFunction:
-	cp ${PWD}/../target/x86_64-unknown-linux-musl/release/backend ${ARTIFACTS_DIR}/bootstrap
+		cp /app/target/x86_64-unknown-linux-musl/release/backend ${ARTIFACTS_DIR}/bootstrap
 
 # Build the LibpqLayer using the SAM `makefile` build method.
 # Copies the static libpq.a and headers into the layer structure.

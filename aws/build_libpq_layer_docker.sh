@@ -37,11 +37,16 @@ docker run --rm \
     cd ${PG_SRC_DIR}
 
     echo '⚙️ Configuring with static build options...'
-    CFLAGS='-fPIC -O2' ./configure --prefix=/tmp/pg --disable-shared --without-readline --without-zlib
+    CFLAGS='-fPIC -O2' ./configure \
+      --prefix=/tmp/pg \
+      --disable-shared \
+      --without-readline \
+      --without-zlib \
+      --without-gssapi
 
     echo '🔨 Building libpq...'
     cd src/interfaces/libpq
-    make
+    make -j$(nproc)
     make install
 
     echo '📁 Copying outputs...'

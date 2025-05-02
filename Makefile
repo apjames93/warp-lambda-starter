@@ -52,5 +52,28 @@ run-backend:
 # SAM stuff
 # =======================================
 
-compile-for-sam:
-	cargo build --release --target x86_64-unknown-linux-musl --bin backend
+
+docker-sam-build:
+	docker build --platform=linux/amd64 -t rust-sam-build -f aws/docker/Dockerfile.build-sam .
+	docker run --platform=linux/amd64 --rm \
+		-v "$(shell pwd)":/app \
+		-v "$(shell pwd)/aws/libpq_layer":/aws/libpq_layer \
+		-v "$(shell pwd)/aws/.aws-sam":/app/aws/.aws-sam \
+		-w /app \
+		rust-sam-build \
+		sh -c "\
+		RUSTFLAGS='-L /aws/libpq_layer/lib \
+			-C link-arg=-lpq \
+			-C link-arg=-lssl \
+			-C link-arg=-lcrypto \
+			-C link-arg=-lz \
+			-C link-arg=-static' \
+		OPENSSL_NO_VENDOR=1 cargo build --release --target x86_64-unknown-linux-musl --bin backend && \
+		sam build --template aws/template.yaml"
+
+		sam local start-api \
+		--env-vars ./aws/env.json \
+		--docker-network sam-local \
+		--debug \
+		--port 4040
+
