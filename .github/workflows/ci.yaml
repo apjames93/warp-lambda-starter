@@ -22,27 +22,20 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Install system dependencies
+      - name: Set up Docker-in-Docker permissions
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config make curl python3-pip libssl-dev musl-tools
+          sudo chown -R $USER:$USER /var/run/docker.sock || true
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-unknown-linux-musl
-          profile: minimal
+      - name: Make sure Docker is working
+        run: docker info
 
-      - name: Add cargo to PATH
-        run: export PATH="$HOME/.cargo/bin:$PATH"
+      - name: Build Rust Lambda with SAM (Docker-based)
+        run: make aws-build-sam
 
-      - name: Install AWS SAM CLI
-        run: pip3 install aws-sam-cli --upgrade
-
-      - name: Sam Validate and Build
-        run: |
-          make compile-for-sam
-          make aws-build-sam
+      - name: Deploy SAM application to AWS
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: make aws-deploy-sam
