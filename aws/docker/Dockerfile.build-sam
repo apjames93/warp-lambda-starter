@@ -1,0 +1,34 @@
+FROM alpine:3.19
+
+RUN apk add --no-cache \
+  musl-dev \
+  gcc \
+  build-base \
+  openssl-dev \
+  zlib-dev \
+  libgcc \
+  libstdc++ \
+  curl \
+  python3 \
+  py3-pip \
+  py3-virtualenv \
+  bash \
+  perl
+
+# Set up virtualenv for AWS SAM CLI
+RUN python3 -m venv /venv && \
+    . /venv/bin/activate && \
+    pip install --upgrade pip && \
+    pip install aws-sam-cli
+
+ENV PATH="/venv/bin:$PATH"
+
+# Install Rust and musl target
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup target add x86_64-unknown-linux-musl
+
+WORKDIR /app
+COPY . .
+
+CMD ["bash"]

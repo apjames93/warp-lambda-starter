@@ -221,6 +221,14 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/rust,osx,linux,windows,pycharm,visualstudiocode
 
+aws/.aws-sam/*
 .aws-sam/*
 libpq_layer.zip
 postgresql-*.
+
+aws/postgresql-10.23.tar.gz
+
+
+/libpq_layer.zip
+/postgresql-10.23/*
+/postgresql-10.23.tar.gz

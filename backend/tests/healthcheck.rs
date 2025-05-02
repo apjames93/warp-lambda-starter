@@ -1,7 +1,7 @@
 use warp::http::StatusCode;
 use warp::Filter;
 
-use sam_rust::{db_healthcheck_handler, init_diesel_pool};
+use backend::{db_healthcheck_handler, init_diesel_pool};
 
 #[tokio::test]
 async fn test_hello_db_healthcheck() {

@@ -1,83 +1,56 @@
 ---
+
 title: "Build a Serverless Rust API with Warp, Diesel, and AWS Lambda"
-description: "How to deploy and run production-grade Rust APIs on AWS Lambda with PostgreSQL using Warp, Diesel, and SAM. Complete guide with CI/CD, Docker, and local testing."
----
+description: "How to deploy and run production-grade Rust APIs on AWS Lambda with PostgreSQL using Warp, Diesel, and SAM. Now featuring custom Docker builds, static linking, and full local dev workflows."
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Build a Serverless Rust API with Warp, Diesel, and AWS Lambda
 
 [![GitHub stars](https://img.shields.io/github/stars/apjames93/warp-lambda-starter?style=social)](https://github.com/apjames93/warp-lambda-starter)
 
-
-> Run production-grade Rust APIs on AWS Lambda with PostgreSQL using Warp, Diesel, and AWS SAM—with full CI/CD and local testing support.
-
-
-# Serverless Rust on AWS Lambda with Warp + Diesel
-
-Learn how to build a serverless Rust API with Warp, Diesel, and AWS Lambda — complete with PostgreSQL support, CI/CD, Docker, and AWS SAM. This guide walks you through deploying a production-ready, async Rust backend that runs serverlessly on Lambda while connecting to a Postgres database using Diesel. Until recently, writing performant, native serverless APIs in Rust required heavy lifting. With the right tools, you can now deploy production-ready, async Rust backends to AWS Lambda—with PostgreSQL access and blazing-fast HTTP routing.
-
-In this guide, we'll walk through a complete implementation of a serverless Rust backend using:
-
-- **[Warp](https://github.com/seanmonstar/warp)**: a high-performance async HTTP server
-- **[Diesel](https://diesel.rs)**: a safe, reliable ORM for PostgreSQL
-- **[warp_lambda](https://crates.io/crates/warp_lambda)**: to adapt Warp to AWS Lambda
-- **[AWS SAM](https://docs.aws.amazon.com/serverless-application-model/)**: to define and deploy your serverless stack
-- **A custom `libpq` Lambda Layer**: to link Diesel with PostgreSQL in the Lambda environment
-
-By the end, you’ll have a fully operational Rust API running on AWS Lambda, backed by PostgreSQL, with everything tested locally and deployable to the cloud.
+> A production-grade setup to deploy Rust APIs to AWS Lambda using Warp, Diesel, Docker, and AWS SAM.
 
 ---
 
-## 💡 Why This Stack?
+## 🚀 Overview
 
-Rust’s safety and performance make it ideal for backend APIs. But Diesel (like many native crates) depends on C libraries like `libpq`, which aren't available by default in Lambda. This setup bridges that gap:
+This guide covers:
 
-- Warp gives you a clean and async API layer
-- Diesel handles safe and performant SQL access
-- AWS SAM + Lambda offers serverless scale without server ops
-- A Docker-built `libpq` layer satisfies native runtime/linking needs
-
-Let’s build it.
+* **Warp**: Fast async web server
+* **Diesel**: Battle-tested ORM for PostgreSQL
+* **warp\_lambda**: Runs Warp on AWS Lambda
+* **AWS SAM**: Infrastructure-as-code for Lambda + API Gateway
+* **Custom Docker builds**: For cross-compilation and static linking
+* **Lambda Layer**: Ships runtime C deps like `libpq`
 
 ---
 
-## 📆 Getting Started
+## 🛠️ Prerequisites
 
-### Prerequisites
-Make sure the following tools are installed:
+Install these tools:
 
 ```bash
 brew install rustup awscli docker aws-sam-cli
-cargo install cargo-lambda
+cargo install cargo-watch       # for hot reloads
+brew install act                # optional: test CI locally
 ```
-
-Optional but recommended:
-```bash
-brew install act
-```
-
-> `act` lets you test GitHub Actions locally
 
 ---
 
-## 🛠️ Clone the Starter Project
-
-Everything in this guide is available in the open-source GitHub repo:
+## 📦 Clone the Starter
 
 ```bash
 git clone https://github.com/apjames93/warp-lambda-starter.git
 cd warp-lambda-starter
 ```
 
-This starter includes:
+You'll get:
 
-- A working Warp + Diesel Rust app
-- Custom `libpq` Lambda Layer for PostgreSQL support
-- `Makefile` for local builds, testing, and deployment
-- GitHub Actions CI pipeline
-- AWS SAM config for infrastructure as code
-- Local Postgres with Docker
-
-👉 [View the repo on GitHub](https://github.com/apjames93/warp-lambda-starter)
+* Warp + Diesel backend
+* Docker-based builds
+* AWS SAM template + Lambda Layer
+* CI/CD via GitHub Actions
+* Local dev with hot reloads
 
 ---
 
@@ -85,308 +58,238 @@ This starter includes:
 
 ```text
 .
-├── rust_app/                # Rust source code (Cargo.toml, main.rs, modules)
-├── libpq_layer/            # Compiled libpq binaries and headers
-├── build_libpq_layer_docker.sh    # Dockerized script to compile libpq
-├── docker-compose.yaml     # Local Postgres (with pgvector)
-├── Makefile                # Commands: build, lint, test, deploy
-├── template.yaml           # AWS SAM function & layer definition
-├── .github/workflows/ci.yml # Continuous integration tests & format checks
+├── backend/                # Rust source
+├── aws/                   # SAM template, Docker builds
+├── aws/libpq_layer/       # Prebuilt libpq + OpenSSL
+├── docker-compose.yaml    # Local Postgres
+├── Makefile               # Build/run shortcuts
+└── .github/workflows/     # CI pipeline
 ```
 
 ---
 
-## 📏 Step-by-Step Implementation
+## 🐘 Local Postgres with Docker Compose
 
-Before diving in, it's helpful to understand how the included `Makefile` abstracts away some of the complexity of SAM builds—particularly with native dependencies like `libpq`.
-
-### 1. Build the PostgreSQL Lambda Layer
-
-Diesel requires `libpq` (the C Postgres client library). We'll compile it into a Lambda-compatible format:
+Run PostgreSQL (pgvector-enabled) locally:
 
 ```bash
-./build_libpq_layer_docker.sh
+docker-compose up
 ```
 
-> This uses an Amazon Linux 2 Docker image to match the Lambda runtime and produces `.so` and header files in `libpq_layer/`.
+Access it via:
 
-#### 🔍 What’s Going on with `LibpqLayer`
-
-To support Diesel's `postgres` backend, we must compile the native `libpq` library into a Lambda-compatible shared object and make it available to the Lambda function. This is done through a custom Lambda Layer defined in `template.yaml`:
-
-```yaml
-LibpqLayer:
-  Type: AWS::Serverless::LayerVersion
-  Metadata:
-    BuildMethod: makefile
-    BuildArchitecture: x86_64
-  Properties:
-    ContentUri: .
-    Description: PG deps for diesel
-    CompatibleRuntimes:
-      - provided.al2
-    RetentionPolicy: Delete
 ```
-This layer is built using the Makefile’s `build-LibpqLayer` target, which copies the compiled `.so` and header files into `.aws-sam/build/LibpqLayer/opt/lib` and `opt/include/libpq`, making them available to your Lambda function at runtime.
+postgres://root:password@localhost:5001/test
+```
 
-We mount this layer in our main function using:
+Inside SAM (Docker network `sam-local`):
+
+```json
+"DATABASE_URL": "postgres://root:password@test-db:5432/test?sslmode=disable"
+```
+
+---
+
+## 🧪 Build the libpq Lambda Layer
+
+> **Quick start:** The `aws/libpq_layer/` directory is pre-committed so you can start building and deploying immediately.
+>
+> **Advanced:** If you want to regenerate the layer (e.g. for a different PostgreSQL version, security updates, or reduced size), run:
+
+```bash
+make aws-docker-sh-libpq
+```
+
+This command:
+
+* Builds `libpq.a`, `libssl.a`, and headers using Alpine + musl
+* Outputs everything to `aws/libpq_layer/{lib, include}`
+* Packages the layer as `libpq_layer.zip` for AWS Lambda use
+
+You’re free to customize or rebuild the layer anytime—just modify `aws/docker/build_libpq_layer_docker.sh`.
+
+Rebuild if:
+
+* You need a newer PostgreSQL version
+* You want smaller artifacts
+* You hit Lambda runtime linking errors
+
+---
+
+## 🧰 Build the Statically Linked Rust Binary
+
+Compile for Lambda using a dedicated Dockerfile:
+
+```bash
+make aws-build-sam
+```
+
+* Uses `musl` toolchain
+* Statically links `libpq`, `libssl`, `zlib`
+* Outputs `bootstrap` binary
+* Runs `sam build` to package it
+
+Set in Docker:
+
+```bash
+RUSTFLAGS="-L /aws/libpq_layer/lib \
+  -C link-arg=-lpq -C link-arg=-lssl -C link-arg=-lcrypto \
+  -C link-arg=-lz -C link-arg=-static"
+```
+
+---
+
+## 🔧 Local Dev vs Lambda Mode
+
+Your `main.rs` supports both:
+
+```rust
+#[cfg(feature = "lambda")]
+warp_lambda::run(service).await?;
+
+#[cfg(not(feature = "lambda"))]
+warp::serve(routes).run(([0, 0, 0, 0], 3000)).await;
+```
+
+In `Cargo.toml`:
+
+```toml
+[features]
+default = ["lambda"]
+lambda = ["lambda_http", "lambda_runtime"]
+```
+
+So you can:
+
+* Run locally with `cargo run`
+* Deploy with `make aws-build-sam`
+
+---
+
+
+If you want to clean up your stack after testing or deployment:
+
+`make aws-delete-sam`
+
+This deletes the deployed stack using sam delete --no-prompts
+
+---
+
+## 🔗 Why the Lambda Layer Is Still Needed
+
+Even with static linking, Lambda may expect `.so` files at runtime:
+
+* Diesel sometimes loads symbols dynamically
+* Musl quirks can cause fallback dynamic linking
+
+To ensure compatibility, we attach the same static artifacts as a Lambda Layer:
 
 ```yaml
 Layers:
   - !Ref LibpqLayer
-```
-
-And configure the required environment variables so that both `pq-sys` (at compile time) and Lambda (at runtime) can locate and link `libpq.so`:
-
-```yaml
 Environment:
   Variables:
+    LD_LIBRARY_PATH: /opt/lib
     PQ_LIB_DIR: /opt/lib
     PQ_INCLUDE_DIR: /opt/include/libpq
-    LD_LIBRARY_PATH: /opt/lib
 ```
 
-At build time, `pq-sys` uses `PQ_LIB_DIR` and `PQ_INCLUDE_DIR`. At runtime, `LD_LIBRARY_PATH` ensures `libpq.so` can be dynamically loaded.
-
-Also note: our `Cargo.toml` includes the following to map the SAM config:
-
-```toml
-[package]
-default-run = "bootstrap"
-
-[[bin]]
-name = "bootstrap"
-path = "src/main.rs"
-```
-
-This aligns with `cargo.toml`:
-
-```yaml
-artifact_executable_name: bootstrap
-Handler: bootstrap
-```
-
-#### 🔧 What's in `build_libpq_layer_docker.sh`
-
-The `build_libpq_layer_docker.sh` script automates the creation of this layer. Here's what it does:
-
-1. Launches an `amazonlinux:2` Docker container
-2. Installs build dependencies (`gcc`, `make`, `openssl-devel`, etc.)
-3. Downloads PostgreSQL source (v10.23)
-4. Builds just the `libpq` client library
-5. Copies the resulting `.so` and headers into `libpq_layer/lib` and `libpq_layer/include/libpq`
-6. Creates a symlink for `libpq.so`
-7. Optionally zips the result for manual upload. AWS SAM will handle this when we deploy
-
-This ensures that everything inside the `libpq_layer` folder is Lambda-compatible and can be reused across builds.
+🧠 **Lightbulb moment**: Build-time and runtime use the exact same files. No duplication. No surprises.
 
 ---
 
-## 2. Start a Local Postgres DB (with pgvector)
+## 🔄 Local Dev with Hot Reloads
 
-This runs a local Postgres instance, ideal for dev + testing:
+Run the API locally with:
 
 ```bash
-docker-compose up -d
+make run-backend
 ```
 
-Accessible at:
+This:
 
-```
-postgres://root:password@test-db:5001/test
-```
+* Starts Warp on `localhost:3000`
+* Watches files via `cargo-watch`
+
+Great for development without SAM overhead.
 
 ---
 
-## 3. Build the Rust Lambda Binary
+## 🌐 Test Locally with SAM
+
+Test your Lambda function locally via Docker:
 
 ```bash
-make sam-build
+make aws-run-sam
 ```
 
-What it does:
+Visit:
 
-- **Sets environment variables** like `PQ_LIB_DIR` and `PQ_INCLUDE_DIR` so that Diesel’s `pq-sys` crate knows where to find the native PostgreSQL client libraries and headers
-- **Adds a custom `RUSTFLAGS` setting** to embed a runtime linker path (`-rpath=/opt/lib`) that ensures Lambda can locate `libpq.so` during execution
-- **Runs `sam build --beta-features`**, which compiles the Rust Lambda using `cargo lambda` and integrates the `libpq` layer into the build output structure
-- **Fails early** if `libpq_layer/lib/libpq.so` is missing, prompting you to run `make sh-libpq` to generate the layer
-
-This enables a seamless local and remote build experience, whether running locally via Docker or deploying to AWS.
+```
+http://localhost:4040/Prod/hello
+```
 
 ---
 
-## 4. Run Locally via SAM
+## ☁️ Deploy to AWS
+
+Deploy your app with:
 
 ```bash
-make sam-run
+make aws-deploy-sam
 ```
 
-Test your endpoint:
+This runs `sam deploy` and provisions:
 
-```
-http://localhost:3000/Prod/hello
-```
-
-You'll see:
-
-```json
-{ "message": "Hello World with DB!" }
-```
+* Lambda function (with `Handler: bootstrap`)
+* API Gateway endpoint
+* Attached Lambda Layer
 
 ---
 
-## 🔍 Inside the Rust App
+## 🔄 CI/CD Pipeline
 
-### `main.rs`
-Initializes the logger, logs environment setup, runs `init_diesel_pool()`, and starts the Warp server with Lambda support:
+GitHub Actions CI runs on push to `main`:
 
-```rust
-#[tokio::main]
-async fn main() {
-    // Setup tracing
-    // Set panic hook
-    // Log env vars like PQ_LIB_DIR
-    init_diesel_pool();
+* Builds with `make aws-build-sam`
+* Runs `make aws-deploy-sam`
+* Validates SAM templates
 
-    let routes = warp::path!("Prod" / "hello")
-        .and(warp::get())
-        .and_then(db_healthcheck_handler);
-
-    warp_lambda::run(warp::service(routes)).await.expect("Failed to start");
-}
-```
-
-### `lib.rs`
-Exports core logic:
-
-```rust
-pub mod db;
-
-pub use db::{get_db_conn, init_diesel_pool, run_diesel_query};
-```
-
-Also contains `db_healthcheck_handler()`:
-
-```rust
-pub async fn db_healthcheck_handler() -> Result<impl warp::Reply, warp::Rejection> {
-    let result = timeout(Duration::from_secs(10), async {
-        run_diesel_query(|conn| sql_query("SELECT 1").execute(conn).map(|_| ())).await
-    })
-    .await;
-    // ... more code
-}
-```
-
-### `db.rs`
-Configures a global `PgPool` with `once_cell` and `r2d2`:
-
-```rust
-pub fn init_diesel_pool() {
-    let manager = ConnectionManager::<PgConnection>::new(db_url);
-    let pool = r2d2::Pool::builder().build(manager).unwrap();
-    POOL.set(pool).unwrap();
-}
-```
-
-### `healthcheck.rs`
-Contains `test_hello_db_healthcheck`:
-
-```rust
-#[tokio::test]
-async fn test_hello_db_healthcheck() {
-    let _ = std::panic::catch_unwind(|| init_diesel_pool());
-
-    let api = warp::path!("Prod" / "hello")
-        .and(warp::get())
-        .and_then(db_healthcheck_handler);
-
-    let res = warp::test::request()
-        .method("GET")
-        .path("/Prod/hello")
-        .reply(&api)
-        .await;
-
-    assert_eq!(res.status(), StatusCode::OK);
-}
-```
-
----
-
-## 🧪 CI: Format, Lint, Test
-
-Your `Makefile` supports:
+Test locally with:
 
 ```bash
-make format     # rustfmt check
-make lint       # clippy
-make test       # run unit + integration tests
-```
-
-### GitHub Actions
-Our `.github/workflows/ci.yml` GitHub Actions workflow runs automatically on push and pull requests to `main`. It:
-
-- Spins up a Postgres 14 service
-- Installs system dependencies (e.g., OpenSSL headers)
-- Runs format and lint checks via `make pretty`
-- Runs tests against a live database
-- Installs and validates the AWS SAM CLI
-- Caches dependencies and toolchains (Cargo, Zig)
-- Builds the Lambda function using `make sam-build`
-
-This provides confidence the project works before deploying, with consistent feedback during development.
-
----
-
-## 📦 Dependencies Overview
-
-```toml
-[dependencies]
-tokio = { version = "1", features = ["macros"] }
-diesel = { version = "2.2.7", features = ["postgres", "r2d2"] }
-warp = "0.3"
-warp_lambda = "0.1.4"
-tracing = { version = "0.1", features = ["log"] }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-openssl = { version = "0.10", features = ["vendored"] }
-r2d2 = "0.8"
-once_cell = "1"
+act push \
+  -W .github/workflows/ci.yaml \
+  --secret-file .env \
+  -P ubuntu-22.04=catthehacker/ubuntu:act-22.04
 ```
 
 ---
 
-## 🚀 Deploying to AWS
+## ✅ Summary
 
-```bash
-sam deploy --guided
-```
+* ⌨️ Local dev with hot reloads using `cargo-watch`
+* 🐳 Cross-compiled builds with musl in Docker
+* 📦 Precompiled `libpq` layer for Diesel and OpenSSL
+* 🔁 Shared artifacts for build and runtime environments
+* 🚀 Seamless deployment to AWS Lambda via SAM
 
-Configure your stack, region, and IAM roles. Once complete, your endpoint will look like:
+**Why this setup works:**
 
-```
-https://<gateway>.amazonaws.com/Prod/hello
-```
-
----
-
-## ✅ Final Thoughts
-
-This pattern unlocks scalable, cost-effective Rust APIs with:
-
-- No infrastructure to manage
-- Native PostgreSQL support via Diesel
-- High performance from Rust and Warp
-- Full local dev/test + CI workflow
-
-If this helped, consider sharing it or contributing. Happy shipping 🦀💨
+* **🔁 Reuse is power** – the same `.a` and `.h` files power both phases
+* **🦀 Native performance** – statically linked with `musl`, optimized for cold starts
+* **🌐 Local-first DX** – develop like a normal Warp app, deploy serverlessly
 
 ---
 
+## 🧭 Next Steps (Coming Soon)
+
+* Set up full AWS infrastructure via CloudFormation (VPC, RDS, subnets, security groups)
+* Add RDS Proxy for pooled DB connections from Lambda
+* Support custom domains via API Gateway and Certbot in SAM
+
 ---
 
-## 🙌 Like this project?
+🦀 A solid foundation for production-ready, serverless Rust APIs.
 
-If you found this guide helpful, please consider [⭐️ starring the repo on GitHub](https://github.com/apjames93/warp-lambda-starter) or [sharing it with your team](https://github.com/apjames93/warp-lambda-starter). Every star helps!
-
-[![GitHub stars](https://img.shields.io/github/stars/apjames93/warp-lambda-starter?style=social)](https://github.com/apjames93/warp-lambda-starter)
+**Happy building!**
