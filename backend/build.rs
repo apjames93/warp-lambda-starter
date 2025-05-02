@@ -1,3 +1,3 @@
 fn main() {
-  // println!("cargo:rustc-link-lib=m");
+  //TODO: Set env var for DATABASE_URL here on build?
 }

@@ -15,20 +15,14 @@ lambda = ["lambda_http", "lambda_runtime"]
 tokio = { workspace = true}
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-
 diesel = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-
 warp = { workspace = true }
 warp_lambda = { workspace = true }
-lambda_http = { version = "0.13.0", optional = true }
-lambda_runtime = { version = "0.13.0", optional = true }
-
 r2d2 = { workspace = true }
 once_cell = { workspace = true }
+openssl = { workspace = true }
 
-openssl = { version = "0.10.68", features = ["vendored"] }
-
-# openssl = { workspace = true }
-# lettre = { workspace = true }
+lambda_http = { workspace = true, optional = true }
+lambda_runtime = { workspace = true, optional = true }
