@@ -1,0 +1,69 @@
+# template.yaml
+
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sam-rust
+
+  Sample AWS SAM template to deploy a Rust-based Lambda function
+  using Diesel with PostgreSQL. Includes a custom Lambda Layer 
+  for the `libpq` C library, required for Diesel's `postgres` backend.
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+
+Resources:
+
+  LibpqLayer:
+    Type: AWS::Serverless::LayerVersion
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: x86_64
+    Properties:
+      ContentUri: .
+      Description: PG deps for diesel
+      CompatibleRuntimes:
+        - provided.al2
+      RetentionPolicy: Delete
+
+  BackendFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: x86_64
+    Properties:
+      CodeUri: ./
+      Handler: bootstrap
+      Runtime: provided.al2
+      Layers:
+        - !Ref LibpqLayer
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          RUST_LOG: debug
+          PGSSLMODE: disabled
+          RUST_BACKTRACE: "1"
+          DATABASE_URL: postgres://root:password@test-db:5432/test?sslmode=disable
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+Outputs:
+
+  HelloWorldApi:
+    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+
+  BackendFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt BackendFunction.Arn
+
+  BackendFunctionIamRole:
+    Description: "Implicit IAM Role created for Hello World function"
+    Value: !GetAtt BackendFunctionRole.Arn

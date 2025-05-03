@@ -10,6 +10,7 @@ pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub static DB_POOL: OnceCell<Arc<DbPool>> = OnceCell::new();
 
 pub fn init_diesel_pool() -> Arc<DbPool> {
+    println!("🔍 DATABASE_URL: {:?}", std::env::var("DATABASE_URL"));
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         eprintln!("❌ DATABASE_URL is not set");
         std::process::exit(1);

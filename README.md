@@ -199,3 +199,8 @@ Special thanks to the maintainers of:
 - [`aws-lambda-rust-runtime`](https://github.com/awslabs/aws-lambda-rust-runtime)
 
 ---
+
+
+
+cargo install cross --git https://github.com/cross-rs/cross --branch main --force
+export CROSS_CONTAINER_ENGINE=docker
